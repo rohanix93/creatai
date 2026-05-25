@@ -38,6 +38,7 @@ const ACTORS = {
   instagram: "apify/instagram-scraper",
   linkedin:  "apimaestro/linkedin-profile-posts",
   twitter:   "apidojo/tweet-scraper",
+  youtube:   "streamers/youtube-scraper",
 } as const;
 
 function token() {
@@ -127,6 +128,19 @@ interface TwitterRow {
   retweetCount?: number;
   replyCount?: number;
   viewCount?: number;
+}
+
+interface YouTubeRow {
+  title?: string;
+  text?: string;
+  description?: string;
+  subtitles?: Array<{ srt?: string; plaintext?: string; text?: string }> | string;
+  transcript?: string | Array<{ text?: string }>;
+  thumbnailUrl?: string;
+  thumbnail?: string;
+  channelName?: string;
+  url?: string;
+  duration?: string;
 }
 
 export async function scrapeTikTok(url: string): Promise<ApifyScrapeResult> {
@@ -229,6 +243,68 @@ export async function scrapeLinkedIn(url: string): Promise<ApifyScrapeResult> {
   }
 }
 
+export async function scrapeYouTube(url: string): Promise<ApifyScrapeResult> {
+  try {
+    const rows = (await runActor(
+      ACTORS.youtube,
+      {
+        startUrls: [{ url }],
+        maxResults: 1,
+        maxResultsShorts: 1,
+        subtitlesLanguage: "en",
+        downloadSubtitles: true,
+      },
+      120 // YouTube actors are slower
+    )) as YouTubeRow[];
+    const r = rows[0];
+    if (!r) throw new Error("No data returned from YouTube actor");
+
+    // Normalize transcript — different actor versions return different shapes
+    let transcript: string | undefined;
+    if (typeof r.transcript === "string") {
+      transcript = r.transcript;
+    } else if (Array.isArray(r.transcript)) {
+      transcript = r.transcript.map((s) => s.text ?? "").filter(Boolean).join(" ");
+    }
+    if (!transcript && r.subtitles) {
+      if (typeof r.subtitles === "string") {
+        transcript = r.subtitles;
+      } else if (Array.isArray(r.subtitles)) {
+        transcript = r.subtitles
+          .map((s) => s.plaintext ?? s.text ?? s.srt ?? "")
+          .filter(Boolean)
+          .join(" ");
+      }
+    }
+    if (!transcript && r.text) transcript = r.text;
+
+    return {
+      ok: true,
+      source: "apify",
+      actor: ACTORS.youtube,
+      platform: "youtube",
+      title: r.title ?? (r.channelName ? `${r.channelName}` : undefined),
+      caption: r.description,
+      transcript,
+      thumbnail_url: r.thumbnailUrl ?? r.thumbnail,
+      source_url: url,
+      raw: r,
+      message: transcript
+        ? "YouTube content + transcript extracted via Apify."
+        : "YouTube metadata extracted via Apify (no captions found).",
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      source: "apify",
+      actor: ACTORS.youtube,
+      platform: "youtube",
+      source_url: url,
+      message: err instanceof Error ? err.message : "YouTube scrape failed",
+    };
+  }
+}
+
 export async function scrapeTwitter(url: string): Promise<ApifyScrapeResult> {
   try {
     const rows = (await runActor(ACTORS.twitter, {
@@ -277,6 +353,8 @@ export async function scrapeViaApify(
       return scrapeInstagram(url);
     case "linkedin":
       return scrapeLinkedIn(url);
+    case "youtube":
+      return scrapeYouTube(url);
     default:
       // Twitter/X URLs come through as "other"
       if (/(twitter\.com|x\.com)\//i.test(url)) return scrapeTwitter(url);

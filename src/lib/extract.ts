@@ -68,9 +68,33 @@ async function extractYouTube(url: string): Promise<ExtractionResult> {
     };
   }
 
+  // Try Apify FIRST because youtube-transcript npm package gets blocked
+  // by YouTube's anti-bot rules from cloud-provider IPs (Vercel, AWS, GCP).
+  // Apify uses residential proxies and is reliable.
+  if (process.env.APIFY_TOKEN) {
+    const apify = await scrapeViaApify(url, "youtube");
+    if (apify && apify.ok) {
+      return {
+        platform: "youtube",
+        source: "youtube",
+        title: apify.title,
+        transcript: apify.transcript,
+        caption: apify.caption,
+        thumbnail_url: apify.thumbnail_url ?? `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+        ok: true,
+        message: apify.message,
+      };
+    }
+  }
+
+  // Fallback: try the npm library (works locally; usually fails on Vercel)
   try {
     const transcriptParts = await YoutubeTranscript.fetchTranscript(id);
-    const transcript = transcriptParts.map((p) => p.text).join(" ").replace(/\s+/g, " ").trim();
+    const transcript = transcriptParts
+      .map((p) => p.text)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
 
     // Try to also fetch oEmbed for title + thumbnail (no API key needed)
     let title: string | undefined;
@@ -102,13 +126,16 @@ async function extractYouTube(url: string): Promise<ExtractionResult> {
         ? "YouTube transcript extracted."
         : "YouTube video found but no transcript available — paste manually below if needed.",
     };
-  } catch (err) {
+  } catch {
+    // Both paths failed — gracefully ask user to paste
     return {
       platform: "youtube",
       source: "unsupported",
+      thumbnail_url: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
       ok: false,
-      message:
-        "Could not fetch YouTube transcript (video may have transcripts disabled, be geo-blocked, or be a Short without captions). Paste the transcript manually.",
+      message: process.env.APIFY_TOKEN
+        ? "Both Apify and direct extraction failed for this YouTube video. It may be private, age-restricted, or have transcripts disabled. Paste transcript manually."
+        : "YouTube transcript extraction is blocked on Vercel by YouTube. Add APIFY_TOKEN to env vars (apify.com) for reliable extraction, or paste the transcript manually.",
     };
   }
 }

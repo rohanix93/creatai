@@ -3,158 +3,168 @@
 > Turn content, ads, creators and competitors into creative intelligence.
 > Understand what works, why it works, and what to create next.
 
-This is the V1 of CREATAI — a single Next.js app deployed to Vercel, using Supabase for auth + database and OpenAI for AI analysis. **No separate backend server, no Python, no Render.**
+Single Next.js app deployed to Vercel. Supabase (auth + DB), OpenAI (analysis + chat). No separate backend server.
 
 ---
 
-## Status
+## What's built (V1)
 
-| Phase | What | Status |
+| Module | Path | Status |
 |---|---|---|
-| 1 | Project shell — landing, auth, dashboard, cyberpunk UI | ✅ Done |
-| 2 | Brand Profile + Analyze Content + Creative DNA generator | ⏳ Next |
-| 3 | Save reports to Supabase + Content Library + filters | ⏳ |
-| 4 | Creative Clusters + Trend Radar + AI Analyst chat | ⏳ |
-| 5 | Polish, demo data, Vercel deploy | ⏳ |
+| Landing page | `/` | ✅ Cyberpunk HUD, dense |
+| Auth (email + password) | `/login`, `/signup` | ✅ Supabase Auth |
+| Dashboard | `/dashboard` | ✅ Live counts + recent activity |
+| Brand Profile | `/brand` | ✅ Multi-brand CRUD |
+| Analyze Content | `/analyze` | ✅ URL + manual entry |
+| → YouTube auto-transcript | | ✅ Free via `youtube-transcript` |
+| → Image URL → vision | | ✅ GPT-4o vision |
+| → TikTok/IG/LinkedIn | | ⏳ Manual (V1.1: Apify) |
+| Creative DNA generation | (API) | ✅ 22 attributes, 6 scores |
+| Content Library | `/library`, `/library/[id]` | ✅ Filters + full DNA report |
+| Competitors watchlist | `/competitors` | ✅ |
+| Creators watchlist | `/creators` | ✅ |
+| Creative Clusters | `/clusters` | ✅ LLM-based grouping |
+| Trend Radar | `/trends` | ✅ Computed from saved data |
+| AI Analyst chat | `/analyst` | ✅ Threaded, context-aware |
+| Settings | `/settings` | ✅ |
+
+21 routes total. Production build green.
 
 ---
 
-## 1. Run it on your Mac (5-minute setup)
+## Setup on your Mac
 
-You already have Node.js and git installed. Now:
+You already have Node, git, and Xcode CLT installed.
 
-### A. Get your Supabase keys
-
-1. Open https://supabase.com/dashboard/project/djauuykxpbdtvkiiuikj/settings/api
-2. You'll see **Project URL** and two **API Keys**.
-3. Keep this tab open — you'll paste from it.
-
-### B. Get your OpenAI key
-
-1. Open https://platform.openai.com/api-keys
-2. Click **Create new secret key**, name it `creatai-local`.
-3. Copy it once (you can't see it again) and keep it for the next step.
-
-### C. Fill in `.env.local`
-
-Open the file `.env.local` in this project (it already exists, empty). Paste the four values:
+### 1. Fill in `.env.local`
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL="https://djauuykxpbdtvkiiuikj.supabase.co"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="paste anon public key from Supabase"
-SUPABASE_SERVICE_ROLE_KEY="paste service_role secret from Supabase"
-OPENAI_API_KEY="paste the key you just created"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="<anon public from Supabase>"
+SUPABASE_SERVICE_ROLE_KEY="<service_role from Supabase>"
+OPENAI_API_KEY="<your new OpenAI key>"
 ```
 
-> ⚠️ Never share, screenshot, or commit `.env.local`. It's already in `.gitignore`.
+Don't include `/rest/v1/` in the URL. Don't include line breaks in the keys.
 
-### D. Start the dev server
+### 2. Run the database migration
 
-Open Terminal, navigate to this folder, run:
+In your Supabase dashboard:
+1. Open https://supabase.com/dashboard/project/djauuykxpbdtvkiiuikj/sql/new
+2. Paste the contents of `supabase/migrations/001_creatai_v1_schema.sql`
+3. Click **Run**
+
+This creates 7 tables (brands, competitors, creators, content_assets, creative_dna_reports, creative_clusters, ai_chat_messages), enables Row-Level Security so each user only sees their own data, and creates a public `thumbnails` storage bucket.
+
+### 3. Run locally
 
 ```bash
 cd /Users/rohan/Downloads/creatai-v1
 npm run dev
 ```
 
-Then open **http://localhost:3000** in your browser.
-
-You should see the **CREATAI landing page** in retro cyberpunk style.
-
-### E. Try it
-
-1. Click **Start analyzing** → fills in `/signup`
-2. Create an account (any email + 8-char password)
-3. If Supabase requires email confirmation, check your inbox for the link
-4. You'll land on **/dashboard** with the full sidebar nav
-5. Most modules say "Phase 2/3/4" — that's expected for V1.0
+Open http://localhost:3000.
 
 ---
 
-## 2. What's actually built
+## Deployment (Vercel)
+
+The app is designed to deploy as-is on Vercel:
+1. Connect this repo to a Vercel project
+2. In Vercel → Settings → Environment Variables, paste the same 4 values from `.env.local`
+3. Vercel auto-detects Next.js and builds — no extra config needed
+
+`/api/analyze` has `maxDuration = 60` set so the LLM call has time. If you need longer, upgrade to Pro.
+
+---
+
+## Architecture
 
 ```
 src/
   app/
-    page.tsx                     ← Landing page
-    layout.tsx                   ← Fonts + global theme
-    globals.css                  ← Cyberpunk design tokens
-    (auth)/
-      login/page.tsx             ← /login
-      signup/page.tsx            ← /signup
-    (app)/                       ← Protected, requires login
-      layout.tsx                 ← Sidebar shell
-      dashboard/page.tsx         ← Command center
-      brand/                     ← Phase 2 stub
-      analyze/                   ← Phase 2 stub
-      library/                   ← Phase 3 stub
-      competitors/               ← Phase 2 stub
-      creators/                  ← Phase 2 stub
-      clusters/                  ← Phase 4 stub
-      trends/                    ← Phase 4 stub
-      analyst/                   ← Phase 4 stub
-      settings/page.tsx          ← Working settings page
-    auth/callback/route.ts       ← Email confirmation handler
-    auth/signout/route.ts        ← Sign-out endpoint
+    page.tsx                            Landing
+    layout.tsx + globals.css            Fonts + cyberpunk design tokens
+    (auth)/                             Public auth routes
+      login/                            /login
+      signup/                           /signup
+    (app)/                              Protected — requires session
+      layout.tsx                        Sidebar + nav guard
+      dashboard/                        Live KPIs + activity feed
+      brand/                            Brand Profile CRUD
+      analyze/                          Analyze form + extraction status
+      library/                          Grid + filters
+      library/[id]/                     Full DNA report
+      competitors/                      Watchlist
+      creators/                         Watchlist
+      clusters/                         LLM grouping
+      trends/                           Computed analytics
+      analyst/                          AI chat
+      settings/                         Operator account
+    api/
+      analyze/                          Generate DNA → save asset + report
+      extract/                          URL → transcript/caption/thumbnail
+      clusters/regenerate/              Re-run clustering
+      analyst/chat/                     Chat completion with context
+    auth/callback/, auth/signout/       Supabase Auth handlers
   components/
-    ui/                          ← Button, Card, Input, Label, Badge
-    terminal-frame.tsx           ← Reusable CRT-frame
-    app-sidebar.tsx              ← Retro left nav
-    page-header.tsx              ← Page heading + StatTile
-    phase-placeholder.tsx        ← Coming-soon screen
+    ui/                                 Button, Card, Input, Label, Badge
+    hud/                                HudDial, WireframeOrb, HexGrid,
+                                        CircuitFrame, MicroLabels, SliderRack,
+                                        TerrainView, DataReadout, MeterBar
+    terminal-frame.tsx                  CRT-frame wrapper
+    app-sidebar.tsx                     Left nav
+    page-header.tsx                     Page heading + StatTile
+    watchlist-form.tsx                  Shared competitor/creator form
   lib/
-    utils.ts                     ← cn() classname helper
-    supabase/
-      client.ts                  ← Browser Supabase client
-      server.ts                  ← Server / service-role clients
-      middleware.ts              ← Auth-aware route protection
-middleware.ts                    ← Next.js middleware entry
+    supabase/client.ts                  Browser Supabase client
+    supabase/server.ts                  Server + service-role clients
+    supabase/middleware.ts              Auth-aware session refresh
+    openai.ts                           OpenAI client + model config
+    extract.ts                          YouTube/image/audio extraction
+    dna.ts                              Creative DNA generation (JSON schema)
+    types.ts                            Shared TypeScript types
+    utils.ts                            cn() helper
+middleware.ts                           Route protection
+supabase/migrations/
+  001_creatai_v1_schema.sql             Run this once in Supabase
 ```
 
 ---
 
-## 3. What you'll do once V1 is fully built
+## Tech stack
 
-- Deploy to Vercel (one click, connect GitHub repo)
-- Delete the old `creatai-backend` repo on GitHub
-- Delete or archive `creative-intelligence-os` (the Lovable repo) — we replaced it
-- Cancel Render / Upstash Redis — not used anymore
-
----
-
-## 4. Tech stack
-
-- **Next.js 16** (App Router) — React framework
-- **TypeScript** — type safety
-- **Tailwind v4** — styling
-- **Supabase** — auth + Postgres database
-- **OpenAI SDK** — Creative DNA + AI Analyst
+- **Next.js 16** (App Router, Turbopack)
+- **React 19**, **TypeScript**
+- **Tailwind v4** — CSS-based theme tokens
+- **Supabase** — auth + Postgres + RLS + storage
+- **OpenAI** — `gpt-4o-mini` for analysis + chat, vision-enabled
+- **youtube-transcript** — free YouTube transcript extraction
 - **react-hook-form + zod** — forms + validation
 - **lucide-react** — icons
 
 ---
 
-## 5. Useful commands
+## V1.1 roadmap (after launch)
+
+- **Apify integration** — auto-extract TikTok/Instagram/LinkedIn captions + media
+- **Whisper integration** — upload audio/video files for transcription
+- **Embeddings + semantic search** — vector search across library
+- **Multi-user team support** — share brands within an org
+- **Public sharable DNA report links** — preview URL for prospects/clients
+- **Brand voice fine-tuning** — let the AI Analyst learn your tone over time
+
+---
+
+## Useful commands
 
 ```bash
-npm run dev        # local dev server with hot reload (port 3000)
-npm run build      # production build (catches errors before deploy)
-npm run start      # runs the production build locally
-npm run lint       # check for linting issues
+npm run dev        # dev server on :3000
+npm run build      # production build
+npm run start      # serve production build locally
+npm run lint       # ESLint
 ```
 
 ---
 
-## 6. Troubleshooting
-
-**Page is blank / "Application error":** Open browser DevTools → Console. Most often it's a missing or wrong env var. Re-check `.env.local` matches the keys in Supabase.
-
-**"Invalid login credentials":** Sign up first at `/signup`. If you signed up but never confirmed via email, check Supabase → Authentication → Users — the user should show up. You can manually confirm in the dashboard if needed.
-
-**Cannot find module `@/...`:** Restart the dev server. Path aliases sometimes need a fresh start.
-
-**Pre-commit / git issues:** Not configured yet. We'll add them in Phase 5.
-
----
-
-Built with ☢️ by an unstoppable founder + an AI that takes notes.
+Built with ☢️ by an unstoppable founder + an AI that ships.

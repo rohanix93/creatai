@@ -33,12 +33,20 @@ export interface ApifyScrapeResult {
  * Actor IDs chosen per platform. Each is a public Apify actor that takes
  * an input URL and returns structured data. Swap these if costs/quality change.
  */
+/**
+ * Default actor IDs. Each is overridable via env var so you can swap actors
+ * (or paste an actor ID directly into Vercel env settings) without code changes.
+ *
+ * To swap: in Vercel → Settings → Environment Variables, add e.g.
+ *   APIFY_ACTOR_LINKEDIN = some-other/linkedin-actor
+ * then redeploy.
+ */
 const ACTORS = {
-  tiktok:    "clockworks/free-tiktok-scraper",
-  instagram: "apify/instagram-scraper",
-  linkedin:  "apimaestro/linkedin-profile-posts",
-  twitter:   "apidojo/tweet-scraper",
-  youtube:   "streamers/youtube-scraper",
+  tiktok:    process.env.APIFY_ACTOR_TIKTOK    || "clockworks/free-tiktok-scraper",
+  instagram: process.env.APIFY_ACTOR_INSTAGRAM || "apify/instagram-scraper",
+  linkedin:  process.env.APIFY_ACTOR_LINKEDIN  || "harvestapi/linkedin-post-detail",
+  twitter:   process.env.APIFY_ACTOR_TWITTER   || "apidojo/tweet-scraper",
+  youtube:   process.env.APIFY_ACTOR_YOUTUBE   || "streamers/youtube-scraper",
 } as const;
 
 function token() {
@@ -110,12 +118,26 @@ interface IgRow {
 }
 
 interface LinkedInRow {
+  // Common fields across LinkedIn post-detail actors. Different actors return
+  // different shapes — we read whichever fields are populated.
   text?: string;
+  postText?: string;
+  content?: string;
+  description?: string;
   postUrl?: string;
+  url?: string;
   authorName?: string;
+  author?: string | { name?: string; fullName?: string };
   imageUrl?: string;
+  image?: string;
+  thumbnailUrl?: string;
+  media?: Array<{ url?: string; thumbnail?: string }>;
   likes?: number;
+  numLikes?: number;
   comments?: number;
+  numComments?: number;
+  shares?: number;
+  numShares?: number;
 }
 
 interface TwitterRow {
@@ -213,23 +235,65 @@ export async function scrapeInstagram(url: string): Promise<ApifyScrapeResult> {
 
 export async function scrapeLinkedIn(url: string): Promise<ApifyScrapeResult> {
   try {
-    const rows = (await runActor(ACTORS.linkedin, {
-      urls: [url],
-      maxPosts: 1,
-    })) as LinkedInRow[];
+    // Different LinkedIn actors expect different input shapes. We send a
+    // superset so most actors find the keys they need:
+    //   - harvestapi/linkedin-post-detail expects `postUrls`
+    //   - apimaestro/linkedin-profile-posts expects `urls`
+    //   - some actors expect `startUrls`
+    const rows = (await runActor(
+      ACTORS.linkedin,
+      {
+        postUrls: [url],
+        urls: [url],
+        startUrls: [{ url }],
+        maxPosts: 1,
+        maxItems: 1,
+      },
+      120
+    )) as LinkedInRow[];
+
     const r = rows[0];
     if (!r) throw new Error("No data returned from LinkedIn actor");
+
+    // Normalize across actor shapes
+    const caption =
+      r.text ?? r.postText ?? r.content ?? r.description ?? undefined;
+    const author =
+      typeof r.author === "string"
+        ? r.author
+        : r.author?.fullName ?? r.author?.name ?? r.authorName;
+    const thumb =
+      r.imageUrl ??
+      r.image ??
+      r.thumbnailUrl ??
+      r.media?.[0]?.url ??
+      r.media?.[0]?.thumbnail;
+
+    // If the actor returned a post URL that doesn't match what we asked for,
+    // surface this as a soft warning — common with profile-feed actors.
+    const returnedUrl = r.postUrl ?? r.url;
+    const mismatched =
+      returnedUrl && url && stripQuery(returnedUrl) !== stripQuery(url);
+
+    if (!caption) {
+      throw new Error(
+        "Actor returned no caption/text for this URL — try a different APIFY_ACTOR_LINKEDIN actor"
+      );
+    }
+
     return {
-      ok: true,
+      ok: !mismatched,
       source: "apify",
       actor: ACTORS.linkedin,
       platform: "linkedin",
-      title: r.authorName,
-      caption: r.text,
-      thumbnail_url: r.imageUrl,
+      title: author,
+      caption,
+      thumbnail_url: thumb,
       source_url: url,
       raw: r,
-      message: "LinkedIn post extracted via Apify.",
+      message: mismatched
+        ? `Apify returned a different post than the URL you provided. The "${ACTORS.linkedin}" actor likely returns recent profile posts instead of single-post details. Set APIFY_ACTOR_LINKEDIN in Vercel env to a post-detail actor like apimaestro/linkedin-post-details, harvestapi/linkedin-post-detail, or your preferred actor from apify.com/store.`
+        : "LinkedIn post extracted via Apify.",
     };
   } catch (err) {
     return {
@@ -241,6 +305,10 @@ export async function scrapeLinkedIn(url: string): Promise<ApifyScrapeResult> {
       message: err instanceof Error ? err.message : "LinkedIn scrape failed",
     };
   }
+}
+
+function stripQuery(u: string) {
+  return u.split(/[?#]/)[0].replace(/\/$/, "").toLowerCase();
 }
 
 export async function scrapeYouTube(url: string): Promise<ApifyScrapeResult> {

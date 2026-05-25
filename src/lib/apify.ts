@@ -44,7 +44,9 @@ export interface ApifyScrapeResult {
 const ACTORS = {
   tiktok:    process.env.APIFY_ACTOR_TIKTOK    || "clockworks/free-tiktok-scraper",
   instagram: process.env.APIFY_ACTOR_INSTAGRAM || "apify/instagram-scraper",
-  linkedin:  process.env.APIFY_ACTOR_LINKEDIN  || "harvestapi/linkedin-post-detail",
+  // Default LinkedIn actor picked by Rohan from apify.com/store —
+  // single-post detail extractor at console.apify.com/actors/Wpp1BZ6yGWjySadk3
+  linkedin:  process.env.APIFY_ACTOR_LINKEDIN  || "Wpp1BZ6yGWjySadk3",
   twitter:   process.env.APIFY_ACTOR_TWITTER   || "apidojo/tweet-scraper",
   youtube:   process.env.APIFY_ACTOR_YOUTUBE   || "streamers/youtube-scraper",
 } as const;

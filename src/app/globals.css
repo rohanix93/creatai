@@ -1,26 +1,323 @@
 @import "tailwindcss";
 
+/* ============================================================
+   CREATAI :: Creative Intelligence OS
+   Design language: retro terminal × cyberpunk command center
+   ============================================================ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Base surface */
+  --bg-0: #06060a;          /* page background */
+  --bg-1: #0b0b14;          /* card background */
+  --bg-2: #11111d;          /* elevated surface */
+  --bg-3: #181828;          /* hover / active */
+
+  /* Ink */
+  --ink-100: #f5f5ff;       /* primary text */
+  --ink-200: #c7c7e0;       /* secondary text */
+  --ink-300: #8a8ab0;       /* muted text */
+  --ink-400: #4a4a6b;       /* very muted / lines */
+
+  /* Borders */
+  --line-100: rgba(168, 85, 247, 0.22);  /* default neon-purple line */
+  --line-200: rgba(0, 255, 157, 0.28);   /* green emphasis line */
+  --line-300: rgba(0, 212, 255, 0.28);   /* blue emphasis line */
+
+  /* Neon palette */
+  --neon-green: #00ff9d;
+  --neon-green-soft: rgba(0, 255, 157, 0.18);
+  --neon-purple: #a855f7;
+  --neon-purple-soft: rgba(168, 85, 247, 0.2);
+  --neon-blue: #00d4ff;
+  --neon-blue-soft: rgba(0, 212, 255, 0.18);
+  --neon-pink: #ff2e92;
+  --neon-amber: #ffb020;
+  --neon-red: #ff3860;
+
+  /* Scan / alert reds — borrowed from reference HUD imagery */
+  --scan-red: #ff4d4d;
+  --scan-red-deep: #cc1f1f;
+  --scan-red-soft: rgba(255, 77, 77, 0.18);
+
+  /* Sand / terrain tones for landscape viewports */
+  --sand-1: #8a5a3a;
+  --sand-2: #c97a4a;
+  --sand-3: #f0a060;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg-0: var(--bg-0);
+  --color-bg-1: var(--bg-1);
+  --color-bg-2: var(--bg-2);
+  --color-bg-3: var(--bg-3);
+
+  --color-ink-100: var(--ink-100);
+  --color-ink-200: var(--ink-200);
+  --color-ink-300: var(--ink-300);
+  --color-ink-400: var(--ink-400);
+
+  --color-line-100: var(--line-100);
+  --color-line-200: var(--line-200);
+  --color-line-300: var(--line-300);
+
+  --color-neon-green: var(--neon-green);
+  --color-neon-purple: var(--neon-purple);
+  --color-neon-blue: var(--neon-blue);
+  --color-neon-pink: var(--neon-pink);
+  --color-neon-amber: var(--neon-amber);
+  --color-neon-red: var(--neon-red);
+
+  --color-scan-red: var(--scan-red);
+  --color-scan-red-deep: var(--scan-red-deep);
+  --color-sand-1: var(--sand-1);
+  --color-sand-2: var(--sand-2);
+  --color-sand-3: var(--sand-3);
+
+  --font-display: var(--font-vt323);
+  --font-mono: var(--font-jetbrains);
+  --font-sans: var(--font-inter);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ============================================================
+   Base
+   ============================================================ */
+
+* {
+  border-color: var(--line-100);
+}
+
+html, body {
+  background: var(--bg-0);
+  color: var(--ink-100);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255, 77, 77, 0.18), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 100% 100%, rgba(168, 85, 247, 0.10), transparent 60%),
+    linear-gradient(180deg, var(--bg-0), var(--bg-0));
+  min-height: 100vh;
+}
+
+/* Selection */
+::selection {
+  background: var(--scan-red);
+  color: #06060a;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--bg-0); }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--scan-red), var(--neon-purple));
+  border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--scan-red-deep); }
+
+/* ============================================================
+   Grid overlay (page background)
+   ============================================================ */
+.cret-grid {
+  background-image:
+    linear-gradient(rgba(168, 85, 247, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(168, 85, 247, 0.06) 1px, transparent 1px);
+  background-size: 36px 36px;
+  background-position: -1px -1px;
+}
+
+.cret-grid-fine {
+  background-image:
+    linear-gradient(rgba(0, 255, 157, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 157, 0.04) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+
+/* ============================================================
+   Scanline overlay (apply on top of dashboard surfaces)
+   ============================================================ */
+.cret-scanlines {
+  position: relative;
+}
+.cret-scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.025) 0,
+    rgba(255, 255, 255, 0.025) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  mix-blend-mode: overlay;
+}
+
+/* ============================================================
+   Terminal text effects
+   ============================================================ */
+.cret-display {
+  font-family: var(--font-vt323), ui-monospace, monospace;
+  letter-spacing: 0.02em;
+  line-height: 0.95;
+}
+
+.cret-mono {
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  letter-spacing: 0.02em;
+}
+
+.cret-glow-green { text-shadow: 0 0 6px rgba(0, 255, 157, 0.7), 0 0 18px rgba(0, 255, 157, 0.35); }
+.cret-glow-purple { text-shadow: 0 0 6px rgba(168, 85, 247, 0.7), 0 0 18px rgba(168, 85, 247, 0.35); }
+.cret-glow-blue  { text-shadow: 0 0 6px rgba(0, 212, 255, 0.7), 0 0 18px rgba(0, 212, 255, 0.35); }
+.cret-glow-pink  { text-shadow: 0 0 6px rgba(255, 46, 146, 0.7), 0 0 18px rgba(255, 46, 146, 0.35); }
+
+.cret-box-glow-green  { box-shadow: 0 0 0 1px rgba(0, 255, 157, 0.5), 0 0 24px rgba(0, 255, 157, 0.2); }
+.cret-box-glow-purple { box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.5), 0 0 24px rgba(168, 85, 247, 0.2); }
+.cret-box-glow-blue   { box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.5), 0 0 24px rgba(0, 212, 255, 0.2); }
+
+/* ============================================================
+   Blink / cursor
+   ============================================================ */
+@keyframes cret-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.cret-blink { animation: cret-blink 1s steps(1) infinite; }
+
+@keyframes cret-flicker {
+  0%, 100% { opacity: 1; }
+  41% { opacity: 1; }
+  42% { opacity: 0.85; }
+  43% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.9; }
+  94% { opacity: 1; }
+}
+.cret-flicker { animation: cret-flicker 4s linear infinite; }
+
+/* ============================================================
+   Corner crosshair decorations (apply to card edges)
+   ============================================================ */
+.cret-corners {
+  position: relative;
+}
+.cret-corners::before,
+.cret-corners::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: var(--neon-green);
+  border-style: solid;
+  border-width: 0;
+}
+.cret-corners::before {
+  top: -1px; left: -1px;
+  border-top-width: 1px;
+  border-left-width: 1px;
+}
+.cret-corners::after {
+  bottom: -1px; right: -1px;
+  border-bottom-width: 1px;
+  border-right-width: 1px;
+}
+
+/* ============================================================
+   Focus rings (sharp, not rounded)
+   ============================================================ */
+*:focus-visible {
+  outline: 1px solid var(--scan-red);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   Marquee-ish stat ticker
+   ============================================================ */
+@keyframes cret-ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.cret-ticker { animation: cret-ticker 30s linear infinite; }
+
+/* ============================================================
+   Glow utilities for scan-red
+   ============================================================ */
+.cret-glow-red { text-shadow: 0 0 6px rgba(255, 77, 77, 0.8), 0 0 18px rgba(255, 77, 77, 0.4); }
+.cret-box-glow-red { box-shadow: 0 0 0 1px rgba(255, 77, 77, 0.55), 0 0 24px rgba(255, 77, 77, 0.22); }
+
+/* ============================================================
+   Halftone dot pattern (cyberpunk circuit feel)
+   ============================================================ */
+.cret-halftone {
+  background-image:
+    radial-gradient(rgba(255, 77, 77, 0.5) 1px, transparent 1.5px);
+  background-size: 6px 6px;
+}
+.cret-halftone-green {
+  background-image:
+    radial-gradient(rgba(0, 255, 157, 0.45) 1px, transparent 1.5px);
+  background-size: 6px 6px;
+}
+
+/* ============================================================
+   Circuit edge ornament
+   ============================================================ */
+.cret-circuit-edge::before,
+.cret-circuit-edge::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 4px,
+      rgba(168, 85, 247, 0.4) 4px,
+      rgba(168, 85, 247, 0.4) 5px,
+      transparent 5px,
+      transparent 9px
+    );
+  height: 4px;
+  left: 24px;
+  right: 24px;
+}
+.cret-circuit-edge::before { top: -1px; }
+.cret-circuit-edge::after { bottom: -1px; }
+
+/* ============================================================
+   Rotating dial animation (slow)
+   ============================================================ */
+@keyframes cret-spin-slow {
+  to { transform: rotate(360deg); }
+}
+@keyframes cret-spin-reverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+.cret-spin-slow { animation: cret-spin-slow 28s linear infinite; transform-origin: center; }
+.cret-spin-rev { animation: cret-spin-reverse 40s linear infinite; transform-origin: center; }
+
+/* ============================================================
+   Subtle pulse for status dots
+   ============================================================ */
+@keyframes cret-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.cret-pulse { animation: cret-pulse 1.6s ease-in-out infinite; }
+
+/* ============================================================
+   Diagonal hatch (warning-tape feel)
+   ============================================================ */
+.cret-hatch {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 176, 32, 0.15) 0,
+    rgba(255, 176, 32, 0.15) 6px,
+    transparent 6px,
+    transparent 12px
+  );
 }

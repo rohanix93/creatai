@@ -1,9 +1,32 @@
 -- ============================================================
 -- CREATAI :: V1 schema
 -- Run this once in your Supabase SQL Editor.
+-- Safe to re-run — drops V1 tables if they exist, then recreates.
 -- ============================================================
 
 create extension if not exists pgcrypto;
+
+-- Drop any existing V1 tables (and old Codex-backend conflicting tables) to start clean.
+-- Order matters because of FK references — drop children first.
+drop table if exists public.ai_chat_messages       cascade;
+drop table if exists public.creative_clusters      cascade;
+drop table if exists public.creative_dna_reports   cascade;
+drop table if exists public.content_assets         cascade;
+drop table if exists public.creators               cascade;
+drop table if exists public.competitors            cascade;
+drop table if exists public.brands                 cascade;
+
+-- Legacy tables from the abandoned Codex backend (drop if present, harmless if absent)
+drop table if exists public.cluster_members             cascade;
+drop table if exists public.clusters                    cascade;
+drop table if exists public.analysis_results            cascade;
+drop table if exists public.content_transcripts         cascade;
+drop table if exists public.content_frames              cascade;
+drop table if exists public.content_items               cascade;
+drop table if exists public.trend_signals               cascade;
+drop table if exists public.creative_prediction_results cascade;
+drop table if exists public.tracking_targets            cascade;
+
 
 -- ============================================================
 -- BRANDS — one user can have many brand profiles

@@ -19,6 +19,7 @@
 
 import { YoutubeTranscript } from "youtube-transcript";
 import { openai, MODELS } from "./openai";
+import { scrapeViaApify } from "./apify";
 import type { Platform } from "./types";
 
 export interface ExtractionResult {
@@ -157,15 +158,31 @@ export async function extractFromUrl(url: string): Promise<ExtractionResult> {
   if (platform === "youtube") return extractYouTube(url);
   if (isImageUrl(url)) return extractImage(url);
 
-  // TikTok / Instagram / LinkedIn / Meta Ad / other URL — V1.1 will scrape
+  // Try Apify for TikTok, Instagram, LinkedIn, Twitter/X.
+  const apify = await scrapeViaApify(url, platform);
+  if (apify && apify.ok) {
+    return {
+      platform: apify.platform,
+      source: "vision", // closest existing enum; we treat scraped data as extracted content
+      title: apify.title,
+      caption: apify.caption,
+      transcript: undefined,
+      thumbnail_url: apify.thumbnail_url,
+      ok: true,
+      message: apify.message,
+    };
+  }
+
+  // Apify either disabled (no token) or failed — fall back to manual
   return {
     platform,
     source: "unsupported",
     ok: false,
-    message:
-      platform === "tiktok" || platform === "instagram" || platform === "linkedin"
-        ? `Auto-extraction for ${platform} is coming in V1.1 (powered by Apify). For now, paste the caption and transcript manually below — analysis will still work.`
-        : "Auto-extraction isn't available for this URL yet. Paste the caption and transcript manually below.",
+    message: apify
+      ? `Apify could not extract this URL (${apify.message}). Paste caption/transcript manually.`
+      : platform === "tiktok" || platform === "instagram" || platform === "linkedin"
+        ? `Auto-extraction for ${platform} requires APIFY_TOKEN. Add it to env vars to enable. For now, paste manually.`
+        : "Auto-extraction isn't available for this URL yet. Paste manually.",
   };
 }
 

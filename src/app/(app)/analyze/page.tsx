@@ -52,11 +52,12 @@ export default async function AnalyzePage() {
       />
 
       {/* Auto-extraction status strip */}
-      <div className="mb-5 grid sm:grid-cols-4 gap-2 cret-mono text-[10px] uppercase tracking-[0.15em]">
+      <div className="mb-5 grid sm:grid-cols-2 lg:grid-cols-5 gap-2 cret-mono text-[10px] uppercase tracking-[0.15em]">
         <ExtractStatus platform="YouTube" status="auto" hint="transcript + thumb" />
         <ExtractStatus platform="Image URL" status="auto" hint="vision analysis" />
-        <ExtractStatus platform="Audio file" status="auto" hint="whisper transcribe" />
-        <ExtractStatus platform="TikTok / IG / LI" status="manual" hint="auto in v1.1" />
+        <ExtractStatus platform="TikTok" status="auto" hint="apify scraper" />
+        <ExtractStatus platform="Instagram" status="auto" hint="apify scraper" />
+        <ExtractStatus platform="LinkedIn / X" status="auto" hint="apify scraper" />
       </div>
 
       <TerminalFrame

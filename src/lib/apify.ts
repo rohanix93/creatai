@@ -340,6 +340,12 @@ export async function scrapeLinkedIn(url: string): Promise<ApifyScrapeResult> {
 
     if (!caption) caption = findLongestText(src);
 
+    // Reject "caption" that's actually just a URL — happens when the actor
+    // returns minimal data and our longest-text fallback grabs the post link.
+    if (caption && /^https?:\/\//i.test(caption.trim()) && !/\s/.test(caption.trim())) {
+      caption = undefined;
+    }
+
     // Author display name — `actor` here means the LinkedIn AUTHOR, not the
     // Apify actor (this scraper's schema names it that way).
     const author =
@@ -376,8 +382,9 @@ export async function scrapeLinkedIn(url: string): Promise<ApifyScrapeResult> {
 
     if (!caption) {
       const keys = Object.keys(src).slice(0, 12).join(", ");
+      const sample = JSON.stringify(src).slice(0, 400);
       throw new Error(
-        `Actor returned no caption/text for this URL. Available top-level fields: [${keys}]. Try a different APIFY_ACTOR_LINKEDIN actor or open a Vercel function log to inspect the raw response.`
+        `Actor returned no readable caption for this URL. Likely the post is private, deleted, or restricted. Top-level fields returned: [${keys}]. Sample: ${sample}. Paste caption manually below.`
       );
     }
 

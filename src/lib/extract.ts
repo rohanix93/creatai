@@ -19,7 +19,7 @@
 
 import { YoutubeTranscript } from "youtube-transcript";
 import { openai, MODELS } from "./openai";
-import { scrapeViaApify } from "./apify";
+import { scrapeViaApify, type ScrapedMetrics } from "./apify";
 import type { Platform } from "./types";
 
 export interface ExtractionResult {
@@ -29,6 +29,7 @@ export interface ExtractionResult {
   transcript?: string;
   caption?: string;
   thumbnail_url?: string;
+  metrics?: ScrapedMetrics;
   // user-facing
   ok: boolean;
   message: string;
@@ -195,6 +196,7 @@ export async function extractFromUrl(url: string): Promise<ExtractionResult> {
       caption: apify.caption,
       transcript: undefined,
       thumbnail_url: apify.thumbnail_url,
+      metrics: apify.metrics,
       ok: true,
       message: apify.message,
     };

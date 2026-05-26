@@ -22,6 +22,13 @@ type ExtractResp = {
   transcript?: string;
   caption?: string;
   thumbnail_url?: string;
+  metrics?: {
+    views?: number;
+    likes?: number;
+    comments?: number;
+    shares?: number;
+    saves?: number;
+  };
   ok?: boolean;
   message?: string;
   error?: string;
@@ -87,6 +94,19 @@ export function AnalyzeForm({
       if (data.caption) setCaption(data.caption);
       if (data.thumbnail_url) setThumbnailUrl(data.thumbnail_url);
       if (data.source) setExtractionSource(data.source);
+
+      // Auto-fill metrics fields when the actor returned them
+      if (data.metrics) {
+        setMetrics((m) => ({
+          views:    data.metrics?.views    != null ? String(data.metrics.views)    : m.views,
+          likes:    data.metrics?.likes    != null ? String(data.metrics.likes)    : m.likes,
+          comments: data.metrics?.comments != null ? String(data.metrics.comments) : m.comments,
+          shares:   data.metrics?.shares   != null ? String(data.metrics.shares)   : m.shares,
+          saves:    data.metrics?.saves    != null ? String(data.metrics.saves)    : m.saves,
+          spend:    m.spend,
+          conversions: m.conversions,
+        }));
+      }
 
       if (data.ok) {
         setExtractMsg({ type: "ok", text: data.message ?? "Content extracted." });

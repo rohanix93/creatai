@@ -15,6 +15,14 @@ import type { Platform } from "./types";
 
 const APIFY_BASE = "https://api.apify.com/v2";
 
+export interface ScrapedMetrics {
+  views?: number;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  saves?: number;
+}
+
 export interface ApifyScrapeResult {
   ok: boolean;
   source: "apify";
@@ -25,6 +33,7 @@ export interface ApifyScrapeResult {
   transcript?: string;
   thumbnail_url?: string;
   source_url: string;
+  metrics?: ScrapedMetrics;
   raw?: unknown;
   message: string;
 }
@@ -120,8 +129,32 @@ interface IgRow {
 }
 
 type LinkedInRow = Record<string, unknown> & {
-  // Common fields across LinkedIn post-detail actors. Different actors return
-  // different shapes — we read whichever fields are populated.
+  // -- harvestapi/linkedin-post-analytics-scraper (HFElvVpoWmD1bD9A7) --
+  post_text?: string;
+  post_link?: string;
+  image_component?: string[];
+  posted_at?: string;
+  social_count?: {
+    num_likes?: number;
+    num_comments?: number;
+    num_shares?: number;
+    reaction_type_counts?: Array<{ count: number; reaction_type: string }>;
+  };
+  // The `actor` key inside the row refers to the LinkedIn AUTHOR
+  // (not the Apify actor), per this scraper's schema.
+  actor?:
+    | string
+    | {
+        actor_name?: string;
+        actor_sub_description?: string;
+        actor_description?: string;
+        actor_image?: string;
+        actor_link?: string;
+        name?: string;
+        fullName?: string;
+      };
+
+  // -- Other actor variants (fallback field names) --
   text?: string;
   postText?: string;
   content?: string;
@@ -135,11 +168,17 @@ type LinkedInRow = Record<string, unknown> & {
   postUrl?: string;
   url?: string;
   authorName?: string;
-  author?: string | { name?: string; fullName?: string };
   imageUrl?: string;
   image?: string;
   thumbnailUrl?: string;
   media?: Array<{ url?: string; thumbnail?: string }>;
+  likes?: number;
+  numLikes?: number;
+  comments?: number;
+  numComments?: number;
+  shares?: number;
+  numShares?: number;
+  views?: number;
   post?: Record<string, unknown>;
   data?: Record<string, unknown>;
 };
@@ -286,6 +325,7 @@ export async function scrapeLinkedIn(url: string): Promise<ApifyScrapeResult> {
 
     // Try every known field name + last-resort longest-text scan
     let caption: string | undefined =
+      src.post_text ??
       src.text ??
       src.postText ??
       src.content ??
@@ -300,20 +340,37 @@ export async function scrapeLinkedIn(url: string): Promise<ApifyScrapeResult> {
 
     if (!caption) caption = findLongestText(src);
 
+    // Author display name — `actor` here means the LinkedIn AUTHOR, not the
+    // Apify actor (this scraper's schema names it that way).
     const author =
-      typeof src.author === "string"
-        ? src.author
-        : src.author?.fullName ?? src.author?.name ?? src.authorName;
+      typeof src.actor === "string"
+        ? src.actor
+        : src.actor?.actor_name ??
+          src.actor?.fullName ??
+          src.actor?.name ??
+          src.authorName;
+
     const thumb =
+      src.image_component?.[0] ??
       src.imageUrl ??
       src.image ??
       src.thumbnailUrl ??
       src.media?.[0]?.url ??
-      src.media?.[0]?.thumbnail;
+      src.media?.[0]?.thumbnail ??
+      (typeof src.actor === "object" ? src.actor?.actor_image : undefined);
+
+    // Metrics — auto-populate the analyze form
+    const metrics: ScrapedMetrics = {
+      likes: src.social_count?.num_likes ?? src.numLikes ?? src.likes,
+      comments:
+        src.social_count?.num_comments ?? src.numComments ?? src.comments,
+      shares: src.social_count?.num_shares ?? src.numShares ?? src.shares,
+      views: src.views,
+    };
 
     // If the actor returned a post URL that doesn't match what we asked for,
     // surface this as a soft warning — common with profile-feed actors.
-    const returnedUrl = src.postUrl ?? src.url;
+    const returnedUrl = src.post_link ?? src.postUrl ?? src.url;
     const mismatched =
       returnedUrl && url && stripQuery(returnedUrl) !== stripQuery(url);
 
@@ -332,11 +389,12 @@ export async function scrapeLinkedIn(url: string): Promise<ApifyScrapeResult> {
       title: author,
       caption,
       thumbnail_url: thumb,
+      metrics: hasAnyMetric(metrics) ? metrics : undefined,
       source_url: url,
       raw: r,
       message: mismatched
-        ? `Apify returned a different post than the URL you provided. The "${ACTORS.linkedin}" actor likely returns recent profile posts instead of single-post details. Set APIFY_ACTOR_LINKEDIN in Vercel env to a post-detail actor like apimaestro/linkedin-post-details, harvestapi/linkedin-post-detail, or your preferred actor from apify.com/store.`
-        : "LinkedIn post extracted via Apify.",
+        ? `Apify returned a different post than the URL you provided. Set APIFY_ACTOR_LINKEDIN in Vercel env to a post-detail actor from apify.com/store.`
+        : "LinkedIn post + analytics extracted via Apify.",
     };
   } catch (err) {
     return {
@@ -352,6 +410,12 @@ export async function scrapeLinkedIn(url: string): Promise<ApifyScrapeResult> {
 
 function stripQuery(u: string) {
   return u.split(/[?#]/)[0].replace(/\/$/, "").toLowerCase();
+}
+
+function hasAnyMetric(m: ScrapedMetrics): boolean {
+  return Object.values(m).some(
+    (v) => typeof v === "number" && !Number.isNaN(v)
+  );
 }
 
 export async function scrapeYouTube(url: string): Promise<ApifyScrapeResult> {

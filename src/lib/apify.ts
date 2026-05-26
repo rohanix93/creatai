@@ -302,12 +302,16 @@ export async function scrapeLinkedIn(url: string): Promise<ApifyScrapeResult> {
   try {
     // Different LinkedIn actors expect different input shapes. We send a
     // superset so most actors find the keys they need:
+    //   - data-slayer/linkedin-post-analytics-scraper expects `linkedin_url` (singular string)
     //   - harvestapi/linkedin-post-detail expects `postUrls`
     //   - apimaestro/linkedin-profile-posts expects `urls`
     //   - some actors expect `startUrls`
     const rows = (await runActor(
       ACTORS.linkedin,
       {
+        linkedin_url: url,
+        linkedinUrl: url,
+        url: url,
         postUrls: [url],
         urls: [url],
         startUrls: [{ url }],
@@ -509,7 +513,9 @@ export async function scrapeYouTube(url: string): Promise<ApifyScrapeResult> {
 
 export async function scrapeTwitter(url: string): Promise<ApifyScrapeResult> {
   try {
+    // apidojo/tweet-scraper expects `startUrls` (array of URL strings or objects)
     const rows = (await runActor(ACTORS.twitter, {
+      startUrls: [url],
       tweetUrls: [url],
       maxItems: 1,
     })) as TwitterRow[];

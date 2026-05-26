@@ -134,6 +134,9 @@ type LinkedInRow = Record<string, unknown> & {
   post_link?: string;
   image_component?: string[];
   posted_at?: string;
+  // When LinkedIn refuses a post (private / restricted), the actor returns
+  // this envelope instead of normal content.
+  entity_component?: { title?: string };
   social_count?: {
     num_likes?: number;
     num_comments?: number;
@@ -316,6 +319,23 @@ export async function scrapeLinkedIn(url: string): Promise<ApifyScrapeResult> {
 
     const r = rows[0];
     if (!r) throw new Error("No data returned from LinkedIn actor");
+
+    // LinkedIn-side refusal: the actor returns an "entity_component" envelope
+    // with a "post cannot be displayed" title when the post is private,
+    // deleted, restricted, or otherwise blocked by LinkedIn.
+    const blockedTitle =
+      r.entity_component?.title ??
+      (r.entity_component &&
+      typeof r.entity_component === "object" &&
+      "title" in r.entity_component
+        ? (r.entity_component as { title?: string }).title
+        : undefined);
+
+    if (blockedTitle && /cannot be displayed|not.?available|restricted|private/i.test(blockedTitle)) {
+      throw new Error(
+        `LinkedIn refused to show this post to the scraper ("${blockedTitle}"). This is a LinkedIn visibility restriction, not a code issue. Likely the post is private, deleted, or restricted to specific connections. Paste the caption manually below, or try a different LinkedIn post.`
+      );
+    }
 
     // Look in r AND any nested .post / .data envelopes
     const nested =

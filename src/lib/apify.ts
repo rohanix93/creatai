@@ -119,13 +119,19 @@ interface IgRow {
   videoViewCount?: number;
 }
 
-interface LinkedInRow {
+type LinkedInRow = Record<string, unknown> & {
   // Common fields across LinkedIn post-detail actors. Different actors return
   // different shapes — we read whichever fields are populated.
   text?: string;
   postText?: string;
   content?: string;
   description?: string;
+  body?: string;
+  commentary?: string;
+  message?: string;
+  summary?: string;
+  postContent?: string;
+  articleText?: string;
   postUrl?: string;
   url?: string;
   authorName?: string;
@@ -134,12 +140,27 @@ interface LinkedInRow {
   image?: string;
   thumbnailUrl?: string;
   media?: Array<{ url?: string; thumbnail?: string }>;
-  likes?: number;
-  numLikes?: number;
-  comments?: number;
-  numComments?: number;
-  shares?: number;
-  numShares?: number;
+  post?: Record<string, unknown>;
+  data?: Record<string, unknown>;
+};
+
+/**
+ * Last-resort caption finder — walks the object and returns the longest
+ * string property at any depth. Used when no known field name matches.
+ */
+function findLongestText(obj: unknown, minLen = 40): string | undefined {
+  let best: string | undefined;
+  const visit = (v: unknown) => {
+    if (typeof v === "string") {
+      if (v.length >= minLen && (!best || v.length > best.length)) best = v;
+    } else if (Array.isArray(v)) {
+      v.forEach(visit);
+    } else if (v && typeof v === "object") {
+      Object.values(v as Record<string, unknown>).forEach(visit);
+    }
+  };
+  visit(obj);
+  return best;
 }
 
 interface TwitterRow {
@@ -257,29 +278,49 @@ export async function scrapeLinkedIn(url: string): Promise<ApifyScrapeResult> {
     const r = rows[0];
     if (!r) throw new Error("No data returned from LinkedIn actor");
 
-    // Normalize across actor shapes
-    const caption =
-      r.text ?? r.postText ?? r.content ?? r.description ?? undefined;
+    // Look in r AND any nested .post / .data envelopes
+    const nested =
+      (r.post && typeof r.post === "object" ? (r.post as LinkedInRow) : undefined) ??
+      (r.data && typeof r.data === "object" ? (r.data as LinkedInRow) : undefined);
+    const src: LinkedInRow = { ...(nested ?? {}), ...r };
+
+    // Try every known field name + last-resort longest-text scan
+    let caption: string | undefined =
+      src.text ??
+      src.postText ??
+      src.content ??
+      src.description ??
+      src.body ??
+      src.commentary ??
+      src.message ??
+      src.summary ??
+      src.postContent ??
+      src.articleText ??
+      undefined;
+
+    if (!caption) caption = findLongestText(src);
+
     const author =
-      typeof r.author === "string"
-        ? r.author
-        : r.author?.fullName ?? r.author?.name ?? r.authorName;
+      typeof src.author === "string"
+        ? src.author
+        : src.author?.fullName ?? src.author?.name ?? src.authorName;
     const thumb =
-      r.imageUrl ??
-      r.image ??
-      r.thumbnailUrl ??
-      r.media?.[0]?.url ??
-      r.media?.[0]?.thumbnail;
+      src.imageUrl ??
+      src.image ??
+      src.thumbnailUrl ??
+      src.media?.[0]?.url ??
+      src.media?.[0]?.thumbnail;
 
     // If the actor returned a post URL that doesn't match what we asked for,
     // surface this as a soft warning — common with profile-feed actors.
-    const returnedUrl = r.postUrl ?? r.url;
+    const returnedUrl = src.postUrl ?? src.url;
     const mismatched =
       returnedUrl && url && stripQuery(returnedUrl) !== stripQuery(url);
 
     if (!caption) {
+      const keys = Object.keys(src).slice(0, 12).join(", ");
       throw new Error(
-        "Actor returned no caption/text for this URL — try a different APIFY_ACTOR_LINKEDIN actor"
+        `Actor returned no caption/text for this URL. Available top-level fields: [${keys}]. Try a different APIFY_ACTOR_LINKEDIN actor or open a Vercel function log to inspect the raw response.`
       );
     }
 

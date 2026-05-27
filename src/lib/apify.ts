@@ -228,6 +228,11 @@ interface YouTubeRow {
   channelName?: string;
   url?: string;
   duration?: string;
+  viewCount?: number;
+  likes?: number;
+  numberOfLikes?: number;
+  commentsCount?: number;
+  numberOfComments?: number;
 }
 
 export async function scrapeTikTok(url: string): Promise<ApifyScrapeResult> {
@@ -240,6 +245,15 @@ export async function scrapeTikTok(url: string): Promise<ApifyScrapeResult> {
     })) as TikTokRow[];
     const r = rows[0];
     if (!r) throw new Error("No data returned from TikTok actor");
+
+    const metrics: ScrapedMetrics = {
+      views: r.playCount,
+      likes: r.diggCount,
+      comments: r.commentCount,
+      shares: r.shareCount,
+      saves: r.collectCount,
+    };
+
     return {
       ok: true,
       source: "apify",
@@ -248,9 +262,10 @@ export async function scrapeTikTok(url: string): Promise<ApifyScrapeResult> {
       title: r.authorMeta?.name ? `@${r.authorMeta.name}` : undefined,
       caption: r.text,
       thumbnail_url: r.videoMeta?.coverUrl,
+      metrics: hasAnyMetric(metrics) ? metrics : undefined,
       source_url: url,
       raw: r,
-      message: "TikTok content extracted via Apify.",
+      message: "TikTok content + analytics extracted via Apify.",
     };
   } catch (err) {
     return {
@@ -274,6 +289,13 @@ export async function scrapeInstagram(url: string): Promise<ApifyScrapeResult> {
     })) as IgRow[];
     const r = rows[0];
     if (!r) throw new Error("No data returned from Instagram actor");
+
+    const metrics: ScrapedMetrics = {
+      views: r.videoViewCount,
+      likes: r.likesCount,
+      comments: r.commentsCount,
+    };
+
     return {
       ok: true,
       source: "apify",
@@ -282,9 +304,10 @@ export async function scrapeInstagram(url: string): Promise<ApifyScrapeResult> {
       title: r.ownerUsername ? `@${r.ownerUsername}` : undefined,
       caption: r.caption,
       thumbnail_url: r.displayUrl,
+      metrics: hasAnyMetric(metrics) ? metrics : undefined,
       source_url: url,
       raw: r,
-      message: "Instagram content extracted via Apify.",
+      message: "Instagram content + analytics extracted via Apify.",
     };
   } catch (err) {
     return {
@@ -484,6 +507,12 @@ export async function scrapeYouTube(url: string): Promise<ApifyScrapeResult> {
     }
     if (!transcript && r.text) transcript = r.text;
 
+    const metrics: ScrapedMetrics = {
+      views: r.viewCount,
+      likes: r.likes ?? r.numberOfLikes,
+      comments: r.commentsCount ?? r.numberOfComments,
+    };
+
     return {
       ok: true,
       source: "apify",
@@ -493,11 +522,12 @@ export async function scrapeYouTube(url: string): Promise<ApifyScrapeResult> {
       caption: r.description,
       transcript,
       thumbnail_url: r.thumbnailUrl ?? r.thumbnail,
+      metrics: hasAnyMetric(metrics) ? metrics : undefined,
       source_url: url,
       raw: r,
       message: transcript
-        ? "YouTube content + transcript extracted via Apify."
-        : "YouTube metadata extracted via Apify (no captions found).",
+        ? "YouTube content + transcript + analytics extracted via Apify."
+        : "YouTube metadata + analytics extracted via Apify (no captions found).",
     };
   } catch (err) {
     return {
@@ -521,6 +551,14 @@ export async function scrapeTwitter(url: string): Promise<ApifyScrapeResult> {
     })) as TwitterRow[];
     const r = rows[0];
     if (!r) throw new Error("No data returned from Twitter actor");
+
+    const metrics: ScrapedMetrics = {
+      views: r.viewCount,
+      likes: r.likeCount,
+      comments: r.replyCount,
+      shares: r.retweetCount,
+    };
+
     return {
       ok: true,
       source: "apify",
@@ -529,9 +567,10 @@ export async function scrapeTwitter(url: string): Promise<ApifyScrapeResult> {
       title: r.author?.userName ? `@${r.author.userName}` : undefined,
       caption: r.fullText ?? r.text,
       thumbnail_url: r.mediaUrl,
+      metrics: hasAnyMetric(metrics) ? metrics : undefined,
       source_url: url,
       raw: r,
-      message: "Tweet extracted via Apify.",
+      message: "Tweet + analytics extracted via Apify.",
     };
   } catch (err) {
     return {

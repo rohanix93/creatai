@@ -14,6 +14,12 @@ const brandSchema = z.object({
   tone: z.string().max(1000).optional().nullable(),
   products: z.string().max(2000).optional().nullable(),
   usps: z.string().max(2000).optional().nullable(),
+  // V1.2 — own social handles
+  handle_instagram: z.string().max(200).optional().nullable(),
+  handle_tiktok: z.string().max(200).optional().nullable(),
+  handle_youtube: z.string().max(200).optional().nullable(),
+  handle_linkedin: z.string().max(200).optional().nullable(),
+  handle_twitter: z.string().max(200).optional().nullable(),
 });
 
 export type BrandFormState = {
@@ -46,6 +52,11 @@ export async function upsertBrand(
     tone: fd(formData, "tone") || null,
     products: fd(formData, "products") || null,
     usps: fd(formData, "usps") || null,
+    handle_instagram: fd(formData, "handle_instagram") || null,
+    handle_tiktok: fd(formData, "handle_tiktok") || null,
+    handle_youtube: fd(formData, "handle_youtube") || null,
+    handle_linkedin: fd(formData, "handle_linkedin") || null,
+    handle_twitter: fd(formData, "handle_twitter") || null,
   });
 
   if (!parsed.success) {
@@ -66,6 +77,11 @@ export async function upsertBrand(
     tone: values.tone ?? null,
     products: values.products ?? null,
     usps: values.usps ?? null,
+    handle_instagram: values.handle_instagram ?? null,
+    handle_tiktok: values.handle_tiktok ?? null,
+    handle_youtube: values.handle_youtube ?? null,
+    handle_linkedin: values.handle_linkedin ?? null,
+    handle_twitter: values.handle_twitter ?? null,
   };
 
   if (values.id) {

@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { CircuitFrame } from "@/components/hud/circuit-frame";
 import { HudDial } from "@/components/hud/hud-dial";
 import { MicroLabels } from "@/components/hud/micro-labels";
+import { ScrapeProfileButton } from "@/components/scrape-profile-button";
 import { BrandForm } from "./brand-form";
 import { setActiveBrand, deleteBrand } from "./actions";
-import type { Brand } from "@/lib/types";
+import type { Brand, Platform } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -134,12 +135,21 @@ export default async function BrandPage({
 }
 
 function BrandRow({ brand }: { brand: Brand }) {
+  const handles: Array<{ platform: Platform; label: string; handle: string | null }> = [
+    { platform: "instagram", label: "IG",  handle: brand.handle_instagram },
+    { platform: "tiktok",    label: "TT",  handle: brand.handle_tiktok },
+    { platform: "youtube",   label: "YT",  handle: brand.handle_youtube },
+    { platform: "linkedin",  label: "LI",  handle: brand.handle_linkedin },
+    { platform: "other",     label: "X",   handle: brand.handle_twitter },
+  ];
+  const setHandles = handles.filter((h) => h.handle && h.handle.trim().length > 0);
+
   return (
     <div className="relative border border-line-100 bg-bg-1/70 p-5 hover:border-scan-red transition overflow-hidden">
       <CircuitFrame corner="br" hue="purple" size={40} />
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <div className="cret-display text-2xl text-ink-100">{brand.name}</div>
             {brand.is_active ? (
               <Badge variant="green">● ACTIVE</Badge>
@@ -153,9 +163,41 @@ function BrandRow({ brand }: { brand: Brand }) {
             </p>
           )}
           {brand.mission && (
-            <p className="text-sm text-ink-200 leading-relaxed line-clamp-2">
+            <p className="text-sm text-ink-200 leading-relaxed line-clamp-2 mb-3">
               {brand.mission}
             </p>
+          )}
+
+          {/* Per-handle bulk scrape row */}
+          {setHandles.length > 0 && (
+            <div className="border-t border-line-100 pt-3 mt-3">
+              <div className="cret-mono text-[10px] uppercase tracking-[0.2em] text-ink-300 mb-2">
+                // your handles — pull your own posts into the library
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {setHandles.map((h) => (
+                  <div
+                    key={h.platform}
+                    className="border border-line-100 px-2 py-1 flex items-center gap-2 bg-bg-0/40"
+                  >
+                    <span className="cret-mono text-[10px] uppercase tracking-[0.2em] text-neon-purple">
+                      {h.label}
+                    </span>
+                    <span className="cret-mono text-[10px] text-ink-200 max-w-32 truncate">
+                      {h.handle}
+                    </span>
+                    <ScrapeProfileButton
+                      handle={h.handle}
+                      platform={h.platform}
+                      brand_id={brand.id}
+                      label="↓ pull"
+                      size="sm"
+                      variant="ghost"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
         <div className="flex flex-col gap-2 shrink-0">
@@ -172,9 +214,7 @@ function BrandRow({ brand }: { brand: Brand }) {
               </Button>
             </form>
           )}
-          <form
-            action={deleteBrand}
-          >
+          <form action={deleteBrand}>
             <input type="hidden" name="id" value={brand.id} />
             <Button type="submit" variant="danger" size="sm">
               Delete

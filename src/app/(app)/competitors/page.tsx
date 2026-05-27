@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CircuitFrame } from "@/components/hud/circuit-frame";
 import { WatchlistForm } from "@/components/watchlist-form";
+import { ScrapeProfileButton } from "@/components/scrape-profile-button";
 import { upsertCompetitor, deleteCompetitor } from "./actions";
 import type { Competitor } from "@/lib/types";
 
@@ -86,12 +87,20 @@ export default async function CompetitorsPage() {
                     <p className="text-xs text-ink-200 mt-2 line-clamp-2">{c.notes}</p>
                   )}
                 </div>
-                <form action={deleteCompetitor}>
-                  <input type="hidden" name="id" value={c.id} />
-                  <Button type="submit" variant="danger" size="sm">
-                    ✕
-                  </Button>
-                </form>
+                <div className="flex flex-col items-end gap-2">
+                  <ScrapeProfileButton
+                    handle={c.handle_or_url}
+                    platform={c.platform}
+                    competitor_id={c.id}
+                    label="▶ Pull posts"
+                  />
+                  <form action={deleteCompetitor}>
+                    <input type="hidden" name="id" value={c.id} />
+                    <Button type="submit" variant="danger" size="sm">
+                      ✕
+                    </Button>
+                  </form>
+                </div>
               </div>
             </div>
           ))}

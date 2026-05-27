@@ -26,6 +26,12 @@ export interface Brand {
   tone: string | null;
   products: string | null;
   usps: string | null;
+  // V1.2 — own handles for bulk self-scrape
+  handle_instagram: string | null;
+  handle_tiktok: string | null;
+  handle_youtube: string | null;
+  handle_linkedin: string | null;
+  handle_twitter: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

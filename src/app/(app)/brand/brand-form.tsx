@@ -100,6 +100,64 @@ export function BrandForm({ brand }: { brand?: Brand | null }) {
         </div>
       </div>
 
+      {/* Own social handles (V1.2) — used for bulk self-scrape */}
+      <div className="border border-line-100 bg-bg-1/30 p-4">
+        <div className="cret-mono text-[10px] uppercase tracking-[0.3em] text-scan-red mb-1">
+          // your handles
+        </div>
+        <p className="text-xs text-ink-300 mb-4">
+          Add your social handles so CREATAI can pull and study your own content.
+          One-click bulk scrape per handle from the brand list below.
+        </p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div>
+            <Label htmlFor="handle_instagram">Instagram</Label>
+            <Input
+              id="handle_instagram"
+              name="handle_instagram"
+              placeholder="@brand or instagram.com/brand"
+              defaultValue={brand?.handle_instagram ?? ""}
+            />
+          </div>
+          <div>
+            <Label htmlFor="handle_tiktok">TikTok</Label>
+            <Input
+              id="handle_tiktok"
+              name="handle_tiktok"
+              placeholder="@brand or tiktok.com/@brand"
+              defaultValue={brand?.handle_tiktok ?? ""}
+            />
+          </div>
+          <div>
+            <Label htmlFor="handle_youtube">YouTube</Label>
+            <Input
+              id="handle_youtube"
+              name="handle_youtube"
+              placeholder="@channel or youtube.com/@channel"
+              defaultValue={brand?.handle_youtube ?? ""}
+            />
+          </div>
+          <div>
+            <Label htmlFor="handle_linkedin">LinkedIn</Label>
+            <Input
+              id="handle_linkedin"
+              name="handle_linkedin"
+              placeholder="username or linkedin.com/in/username"
+              defaultValue={brand?.handle_linkedin ?? ""}
+            />
+          </div>
+          <div>
+            <Label htmlFor="handle_twitter">X / Twitter</Label>
+            <Input
+              id="handle_twitter"
+              name="handle_twitter"
+              placeholder="@brand or x.com/brand"
+              defaultValue={brand?.handle_twitter ?? ""}
+            />
+          </div>
+        </div>
+      </div>
+
       {state.message && (
         <div
           className={

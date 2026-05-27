@@ -60,6 +60,20 @@ const ACTORS = {
   youtube:   process.env.APIFY_ACTOR_YOUTUBE   || "streamers/youtube-scraper",
 } as const;
 
+/**
+ * Profile-level actors — different from the single-post ones because
+ * the input shape and reliability differ. For bulk pulls of a creator's
+ * recent posts, these are the right actors.
+ */
+const PROFILE_ACTORS = {
+  tiktok:    process.env.APIFY_ACTOR_TIKTOK_PROFILE    || "clockworks/free-tiktok-scraper",
+  instagram: process.env.APIFY_ACTOR_INSTAGRAM_PROFILE || "apify/instagram-scraper",
+  // apimaestro/linkedin-profile-posts has 98% success / 1M+ runs in last 30d
+  linkedin:  process.env.APIFY_ACTOR_LINKEDIN_PROFILE  || "apimaestro/linkedin-profile-posts",
+  twitter:   process.env.APIFY_ACTOR_TWITTER_PROFILE   || "apidojo/tweet-scraper",
+  youtube:   process.env.APIFY_ACTOR_YOUTUBE_PROFILE   || "streamers/youtube-scraper",
+} as const;
+
 function token() {
   const t = process.env.APIFY_TOKEN;
   if (!t) {
@@ -606,5 +620,393 @@ export async function scrapeViaApify(
       // Twitter/X URLs come through as "other"
       if (/(twitter\.com|x\.com)\//i.test(url)) return scrapeTwitter(url);
       return null;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//   BULK PROFILE SCRAPE  (V1.2)
+//
+// Given a handle + platform + count, pull that creator's N most recent posts.
+// Used by competitor / creator / brand pages so the user can bulk-import
+// content for analysis without pasting URLs one by one.
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface ScrapedPost {
+  platform: Platform;
+  source_url: string;
+  title?: string;        // e.g. "@username" or post title
+  caption?: string;
+  transcript?: string;
+  thumbnail_url?: string;
+  metrics?: ScrapedMetrics;
+  posted_at?: string;    // ISO timestamp if available
+}
+
+export interface ScrapeProfileResult {
+  ok: boolean;
+  platform: Platform;
+  handle: string;
+  posts: ScrapedPost[];
+  message: string;
+  actor: string;
+}
+
+/**
+ * Normalize a handle/URL/at-handle into a bare username for actors that need it.
+ */
+function bareHandle(input: string): string {
+  let s = input.trim();
+  if (s.startsWith("@")) s = s.slice(1);
+  // Pull username from a URL
+  const m = s.match(/^https?:\/\/(?:www\.)?(?:tiktok\.com|instagram\.com|linkedin\.com\/in|linkedin\.com\/company|twitter\.com|x\.com|youtube\.com)\/@?([^/?#]+)/i);
+  if (m) return m[1];
+  return s;
+}
+
+function asUrl(input: string, platform: Platform): string {
+  if (/^https?:\/\//i.test(input)) return input.replace(/\/+$/, "");
+  const h = bareHandle(input);
+  switch (platform) {
+    case "tiktok":    return `https://www.tiktok.com/@${h}`;
+    case "instagram": return `https://www.instagram.com/${h}/`;
+    case "linkedin":  return `https://www.linkedin.com/in/${h}`;
+    case "youtube":   return `https://www.youtube.com/@${h}`;
+    default:          return `https://x.com/${h}`;
+  }
+}
+
+// ─────────────────────────  TikTok bulk  ─────────────────────────
+async function scrapeTikTokProfile(handle: string, count: number): Promise<ScrapeProfileResult> {
+  const username = bareHandle(handle);
+  try {
+    const rows = (await runActor(
+      PROFILE_ACTORS.tiktok,
+      {
+        profiles: [username],
+        resultsPerPage: count,
+        profileScrapeSections: ["videos"],
+        profileSorting: "latest",
+        shouldDownloadVideos: false,
+        shouldDownloadCovers: false,
+        excludePinnedPosts: false,
+      },
+      180
+    )) as TikTokRow[];
+
+    const posts: ScrapedPost[] = rows.slice(0, count).map((r) => ({
+      platform: "tiktok",
+      source_url: r.webVideoUrl ?? r.videoUrl ?? `https://www.tiktok.com/@${username}`,
+      title: r.authorMeta?.name ? `@${r.authorMeta.name}` : undefined,
+      caption: r.text,
+      thumbnail_url: r.videoMeta?.coverUrl,
+      metrics: hasAnyMetric({
+        views: r.playCount,
+        likes: r.diggCount,
+        comments: r.commentCount,
+        shares: r.shareCount,
+        saves: r.collectCount,
+      })
+        ? {
+            views: r.playCount,
+            likes: r.diggCount,
+            comments: r.commentCount,
+            shares: r.shareCount,
+            saves: r.collectCount,
+          }
+        : undefined,
+    }));
+
+    return {
+      ok: true,
+      platform: "tiktok",
+      handle: username,
+      posts,
+      actor: PROFILE_ACTORS.tiktok,
+      message: `Pulled ${posts.length} TikTok posts from @${username}.`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      platform: "tiktok",
+      handle: username,
+      posts: [],
+      actor: PROFILE_ACTORS.tiktok,
+      message: err instanceof Error ? err.message : "TikTok profile scrape failed",
+    };
+  }
+}
+
+// ─────────────────────────  Instagram bulk  ─────────────────────────
+async function scrapeInstagramProfile(handle: string, count: number): Promise<ScrapeProfileResult> {
+  const username = bareHandle(handle);
+  const profileUrl = `https://www.instagram.com/${username}/`;
+  try {
+    const rows = (await runActor(
+      PROFILE_ACTORS.instagram,
+      {
+        directUrls: [profileUrl],
+        resultsType: "posts",
+        resultsLimit: count,
+        addParentData: false,
+      },
+      180
+    )) as IgRow[];
+
+    const posts: ScrapedPost[] = rows.slice(0, count).map((r) => ({
+      platform: "instagram",
+      source_url: r.shortCode
+        ? `https://www.instagram.com/p/${r.shortCode}/`
+        : profileUrl,
+      title: r.ownerUsername ? `@${r.ownerUsername}` : `@${username}`,
+      caption: r.caption,
+      thumbnail_url: r.displayUrl,
+      metrics: hasAnyMetric({
+        views: r.videoViewCount,
+        likes: r.likesCount,
+        comments: r.commentsCount,
+      })
+        ? {
+            views: r.videoViewCount,
+            likes: r.likesCount,
+            comments: r.commentsCount,
+          }
+        : undefined,
+    }));
+
+    return {
+      ok: true,
+      platform: "instagram",
+      handle: username,
+      posts,
+      actor: PROFILE_ACTORS.instagram,
+      message: `Pulled ${posts.length} Instagram posts from @${username}.`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      platform: "instagram",
+      handle: username,
+      posts: [],
+      actor: PROFILE_ACTORS.instagram,
+      message: err instanceof Error ? err.message : "Instagram profile scrape failed",
+    };
+  }
+}
+
+// ─────────────────────────  LinkedIn bulk  ─────────────────────────
+async function scrapeLinkedInProfile(handle: string, count: number): Promise<ScrapeProfileResult> {
+  const username = bareHandle(handle);
+  try {
+    const rows = (await runActor(
+      PROFILE_ACTORS.linkedin,
+      {
+        username,
+        total_posts: count,
+        limit: count,
+        page_number: 1,
+      },
+      180
+    )) as LinkedInRow[];
+
+    const posts: ScrapedPost[] = rows.slice(0, count).map((r) => {
+      const caption =
+        r.post_text ??
+        r.text ??
+        r.postText ??
+        r.content ??
+        r.description ??
+        undefined;
+      const author =
+        typeof r.actor === "string"
+          ? r.actor
+          : r.actor?.actor_name ??
+            r.actor?.fullName ??
+            r.actor?.name ??
+            r.authorName;
+      const thumb =
+        r.image_component?.[0] ??
+        r.imageUrl ??
+        r.image ??
+        r.thumbnailUrl ??
+        (typeof r.actor === "object" ? r.actor?.actor_image : undefined);
+      const source =
+        r.post_link ??
+        r.postUrl ??
+        r.url ??
+        `https://www.linkedin.com/in/${username}`;
+      const metrics: ScrapedMetrics = {
+        likes: r.social_count?.num_likes ?? r.numLikes ?? r.likes,
+        comments:
+          r.social_count?.num_comments ?? r.numComments ?? r.comments,
+        shares: r.social_count?.num_shares ?? r.numShares ?? r.shares,
+      };
+      return {
+        platform: "linkedin",
+        source_url: source,
+        title: author ?? `@${username}`,
+        caption,
+        thumbnail_url: thumb,
+        metrics: hasAnyMetric(metrics) ? metrics : undefined,
+        posted_at: r.posted_at,
+      };
+    });
+
+    return {
+      ok: posts.length > 0,
+      platform: "linkedin",
+      handle: username,
+      posts,
+      actor: PROFILE_ACTORS.linkedin,
+      message: `Pulled ${posts.length} LinkedIn posts from ${username}.`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      platform: "linkedin",
+      handle: username,
+      posts: [],
+      actor: PROFILE_ACTORS.linkedin,
+      message: err instanceof Error ? err.message : "LinkedIn profile scrape failed",
+    };
+  }
+}
+
+// ─────────────────────────  Twitter bulk  ─────────────────────────
+async function scrapeTwitterProfile(handle: string, count: number): Promise<ScrapeProfileResult> {
+  const username = bareHandle(handle);
+  try {
+    const rows = (await runActor(
+      PROFILE_ACTORS.twitter,
+      {
+        twitterHandles: [username],
+        maxItems: count,
+        sort: "Latest",
+      },
+      180
+    )) as TwitterRow[];
+
+    const posts: ScrapedPost[] = rows.slice(0, count).map((r) => ({
+      platform: "other",
+      source_url: r.url ?? `https://x.com/${username}`,
+      title: r.author?.userName ? `@${r.author.userName}` : `@${username}`,
+      caption: r.fullText ?? r.text,
+      thumbnail_url: r.mediaUrl,
+      metrics: hasAnyMetric({
+        views: r.viewCount,
+        likes: r.likeCount,
+        comments: r.replyCount,
+        shares: r.retweetCount,
+      })
+        ? {
+            views: r.viewCount,
+            likes: r.likeCount,
+            comments: r.replyCount,
+            shares: r.retweetCount,
+          }
+        : undefined,
+    }));
+
+    return {
+      ok: true,
+      platform: "other",
+      handle: username,
+      posts,
+      actor: PROFILE_ACTORS.twitter,
+      message: `Pulled ${posts.length} tweets from @${username}.`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      platform: "other",
+      handle: username,
+      posts: [],
+      actor: PROFILE_ACTORS.twitter,
+      message: err instanceof Error ? err.message : "Twitter profile scrape failed",
+    };
+  }
+}
+
+// ─────────────────────────  YouTube bulk  ─────────────────────────
+async function scrapeYouTubeProfile(handle: string, count: number): Promise<ScrapeProfileResult> {
+  const username = bareHandle(handle);
+  const channelUrl = asUrl(username, "youtube");
+  try {
+    const rows = (await runActor(
+      PROFILE_ACTORS.youtube,
+      {
+        startUrls: [{ url: channelUrl }],
+        maxResults: count,
+        maxResultsShorts: 0,
+        downloadSubtitles: false,
+      },
+      180
+    )) as YouTubeRow[];
+
+    const posts: ScrapedPost[] = rows.slice(0, count).map((r) => ({
+      platform: "youtube",
+      source_url: r.url ?? channelUrl,
+      title: r.title ?? r.channelName ?? `@${username}`,
+      caption: r.description,
+      thumbnail_url: r.thumbnailUrl ?? r.thumbnail,
+      metrics: hasAnyMetric({
+        views: r.viewCount,
+        likes: r.likes ?? r.numberOfLikes,
+        comments: r.commentsCount ?? r.numberOfComments,
+      })
+        ? {
+            views: r.viewCount,
+            likes: r.likes ?? r.numberOfLikes,
+            comments: r.commentsCount ?? r.numberOfComments,
+          }
+        : undefined,
+    }));
+
+    return {
+      ok: true,
+      platform: "youtube",
+      handle: username,
+      posts,
+      actor: PROFILE_ACTORS.youtube,
+      message: `Pulled ${posts.length} YouTube videos from @${username}.`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      platform: "youtube",
+      handle: username,
+      posts: [],
+      actor: PROFILE_ACTORS.youtube,
+      message: err instanceof Error ? err.message : "YouTube profile scrape failed",
+    };
+  }
+}
+
+/**
+ * Public dispatcher — scrape a profile's recent posts by platform.
+ * Caps `count` at 100 to keep cost predictable.
+ */
+export async function scrapeProfile(
+  handle: string,
+  platform: Platform,
+  count = 20
+): Promise<ScrapeProfileResult> {
+  if (!process.env.APIFY_TOKEN) {
+    return {
+      ok: false,
+      platform,
+      handle,
+      posts: [],
+      actor: "<none>",
+      message:
+        "APIFY_TOKEN not set in env vars. Add it in Vercel → Settings → Environment Variables.",
+    };
+  }
+  const n = Math.max(1, Math.min(100, Math.floor(count)));
+  switch (platform) {
+    case "tiktok":    return scrapeTikTokProfile(handle, n);
+    case "instagram": return scrapeInstagramProfile(handle, n);
+    case "linkedin":  return scrapeLinkedInProfile(handle, n);
+    case "youtube":   return scrapeYouTubeProfile(handle, n);
+    default:          return scrapeTwitterProfile(handle, n);
   }
 }

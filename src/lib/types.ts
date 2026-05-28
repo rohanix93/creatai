@@ -144,6 +144,47 @@ export interface CreativeCluster {
   updated_at: string;
 }
 
+export interface BrandAnalysis {
+  id: string;
+  owner_id: string;
+  brand_id: string;
+  // Diagnose
+  niche: string | null;
+  summary: string | null;
+  audience_tags: string[] | null;
+  strengths: Array<{ title: string; evidence?: string }> | null;
+  areas_to_improve: Array<{ title: string; evidence?: string; fix?: string }> | null;
+  // Pain
+  underperformers: Array<{
+    asset_id: string;
+    title?: string;
+    views?: number;
+    reason?: string;
+  }> | null;
+  // Growth potential
+  virality_score: number | null;
+  growth_multiplier: number | null;
+  growth_curve: Array<{ day: number; multiplier: number }> | null;
+  // Aspiration
+  target_followers: number | null;
+  target_date: string | null;
+  aspiration_statement: string | null;
+  // Plan
+  recommended_hooks: string[] | null;
+  content_ideas: Array<{
+    title: string;
+    hook?: string;
+    format?: string;
+    why?: string;
+  }> | null;
+  posting_cadence: string | null;
+  // Meta
+  asset_count_at_analysis: number;
+  model: string;
+  raw_response: unknown;
+  created_at: string;
+}
+
 export interface ChatMessage {
   id: string;
   owner_id: string;

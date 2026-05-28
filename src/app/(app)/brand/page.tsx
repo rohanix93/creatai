@@ -201,6 +201,11 @@ function BrandRow({ brand }: { brand: Brand }) {
           )}
         </div>
         <div className="flex flex-col gap-2 shrink-0">
+          <a href={`/brand/${brand.id}/dna`}>
+            <Button variant="primary" size="sm">
+              ▶ DNA
+            </Button>
+          </a>
           <a href={`/brand?edit=${brand.id}`}>
             <Button variant="secondary" size="sm">
               Edit
